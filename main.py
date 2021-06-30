@@ -1,29 +1,33 @@
-import numpy as np
-from roll import *
 from DieStats import DieStats
+import matplotlib.pyplot as plt
 
-a = DieStats(1, 6, name='1d6')
-b = -DieStats(1, 6, name='1d6')
-print(f"\n{(a + 1).text()}")
-print(f"\n{(1 + a).text()}")
-print(f"\n{(a - 1).text()}")
-print(f"\n{(1 - a).text()}")
-# a += b
-# print("\n", a)
-# d = DieStats((5, 10), name='5d8')
-# print("\n", d)
-# e = DieStats.sum(a,b,d)
-# print("\n", e)
+a_base = DieStats((1, 20), 5, 'attack')
+a_sharp = a_base - 5
 
-# def warhammer_damage(magic: int = 0, str_mod: int = 0, hands: int = 1):
-# 	return
 
-# char_AC = 24
-# char_conS = 9
-# char_atk = 16
-# def char_melee_dmg():
-# 	return {'bludgeoning': '1d8+9', 'necrotic': 4, 'fire': 6}
-# char_boom_dmg = ()
+d_base = DieStats((2,6), (1,8), 3, 'damage')
+d_base_2 = d_base.scalar_multiply(2, False, 'crit damage')
+d_sharp = d_base + 10
+d_sharp_2 = d_sharp.scalar_multiply(2, False, 'crit damage')
 
-# drag_AC = 20
-# drag_atk = 14
+
+print()
+c = a_base.if_then([12,25], [0, d_base, d_base_2], "attack c")
+c_range = range(c.get_min(), c.get_max()+1)
+print(c.text())
+#print(c.get_pmf())
+
+print()
+d = a_sharp.if_then([12,20], [0, d_sharp, d_sharp_2], "attack d")
+d_range = range(d.get_min(), d.get_max()+1)
+print(d.text())
+#print(d.get_pmf())
+
+print()
+e = d-c
+e_range = range(e.get_min(), e.get_max()+1)
+#print(e.text())
+#print(e.get_pmf())
+
+plt.plot(c_range, c.get_pmfnorm(), d_range, d.get_pmfnorm())#, e_range, e.get_pmfnorm())
+plt.show()
