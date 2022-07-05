@@ -220,11 +220,15 @@ class DieStats:
 		return self.roll(count)
 	def __rmatmul__(self, count):
 		return self.roll(count)
-	def __imatmul__(self, other): return NotImplemented
+	def __imatmul__(self, other):return NotImplemented
 
 	# def __truediv__(self, other): return NotImplemented
-	# def __floordiv__(self, other): return NotImplemented
-	# def __mod__(self, other): return NotImplemented
+	def __floordiv__(self, other):
+		self = self.copy()
+		self._min //= other
+		
+		
+	# def __mod__(self, other): return NotImplemented					#odds of rolling a specific number
 	# def __divmod__(self, other): return NotImplemented
 	# def __pow__(self, other, modulo): return NotImplemented
 	# def __lshift__(self, other): return NotImplemented
@@ -282,13 +286,16 @@ class DieStats:
 		else:
 			return NotImplemented
 	def __le__(self, other):
-		if isinstance(other, int): return self.__lt__(other + 1)
+		if isinstance(other, int):
+			return self.__lt__(other + 1)
 		return NotImplemented
 	def __gt__(self, other):
-		if isinstance(other, int): return 1 - self.__lt__(other + 1)
+		if isinstance(other, int):
+			return 1 - self.__lt__(other + 1)
 		return NotImplemented
 	def __ge__(self, other):
-		if isinstance(other, int): return 1 - self.__lt__(other)
+		if isinstance(other, int):
+			return 1 - self.__lt__(other)
 		return NotImplemented
 	def __eq__(self, other):
 		if isinstance(other, int):
@@ -301,45 +308,67 @@ class DieStats:
 		return 1 - self.__eq__(other)
 
 
-	def if_then(in_check, comparisons:list, outputs:list, name:str=None):
-		pmf = in_check.get_pmf()
+	def conditional_roll(in_check, output:list, condition:list=None, name:str=None):
+		"""
+		in_check: A roll object to be compared against the condition list.
+		output: A list of resulting roll (or roll-like) objects to be rolled if the corresponding condition is met or exeeded.
+		condition [optional]: A list of strictly decreasing integers.
+		name [optional]: A string to name the resulting roll object.
 
-		out_count = len(outputs)
-		comparisons.append(in_check.get_max()+1)
-		for i in range(len(comparisons)):
-			comparisons[i] = comparisons[i] - in_check.get_min()
-		counts = np.zeros(out_count, dtype=int)
+		The output list must be the same length as the condition list or exactly 1 longer. If they are the same length, the output if all conditions are false will default to 0, otherwise the final element of output will be used.
 
-		i = 0
-		for j in range(len(pmf)):
-			while j >= comparisons[i]: i += 1
-			counts[i] += pmf[j]
+		If output is given but not condition, it should instead be in the form of a list of (output, condition) tuples; again, with the conditions in strictly decreasing order. If all tuples contain 2 elements, then the all false condition output will default to 0, otherwise, if the final tuple only contains 1 element (output,), this final value will be used.
+		"""
 
-		weights = []
-		for i in range(out_count):
-			if not isinstance(outputs[i], DieStats):
-				outputs[i] = DieStats("temp", outputs[i])
-			weights.append(outputs[i].get_mass())
-		lcm = np.lcm.reduce(weights)
+		self = in_check.copy(name)
+		if condition is None:
+			if len(output[-1]) == 1: output[-1] += (np.NINF,)
+			output, condition = map(list, zip(*output))
+		if condition[-1] != np.NINF:
+			condition.append(np.NINF)
+		if len(condition) > len(output):
+			output.append(0)
+		cond_cnt = len(output)
+		for c in range(cond_cnt): # Ensure all outputs are DieStats
+			if not isinstance(output[c], DieStats):
+				output[c] = DieStats("temp", output[c])
+
+		for c in range(cond_cnt): # Normalize conditions by effectively setting _min to 0
+			condition[c] = condition[c] - self.get_min()
+		counts = np.zeros(cond_cnt, dtype=int) # Keep track of how many ways to get each output
+
+		c = 0
+		for i in range(len(self)-1, -1, -1): # Iterate through possible rolls high->low
+			while i + self.get_min() < condition[c]: c += 1 # If no possibility of meeting condition: skip
+			counts[c] += self._pmf[i] # Add pmf to counts
+		del c
+
+		weights = np.zeros(cond_cnt, dtype=int) # The multiplier for each output's pmf
+		for c in range(cond_cnt):
+			weights[c] = output[c].get_mass() # Set weights to the total mass of each output
+		lcm = np.lcm.reduce(weights) # Find lcm of all weights
 		weights = lcm // weights * counts
 		weights //= np.gcd.reduce(weights)
 
 		max_, min_ = np.NINF, np.inf
-		for i in range(out_count):
-			if counts[i] > 0:
-				max_ = max(max_, outputs[i].get_max())
-				min_ = min(min_, outputs[i].get_min())
-		
+		for c in range(cond_cnt):
+			if counts[c] > 0: # If there is at least one case this condition was met
+				max_ = max(max_, output[c].get_max())
+				min_ = min(min_, output[c].get_min())
+
+		if max_ == np.NINF:# If no conditions were met: return blank roll
+			return DieStats(name = name)
+			
 		pmf = np.zeros(max_ - min_ + 1, dtype=int)
 		mass, avg = 0, 0
-		for i in range(out_count):
-			if counts[i] == 0: continue
-			offset = outputs[i].get_min() - min_
-			for j in range(len(outputs[i])):
-				weight = outputs[i]._pmf[j] * weights[i]
-				pmf[j+offset] += weight
+		for c in range(cond_cnt):
+			if counts[c] == 0: continue # If this condition was never met
+			offset = output[c].get_min() - min_
+			for i in range(len(output[c])):
+				weight = output[c]._pmf[i] * weights[c]
+				pmf[i + offset] += weight
 				mass += weight
-				avg += weight * (j+offset)
+				avg += weight * (i + offset)
 		avg = avg/mass + min_
 		var = np.var(pmf)
 
@@ -348,7 +377,7 @@ class DieStats:
 
 	def __str__(self): return self._name
 	def text(self):
-		return f"{self.name_txt()}\n> {self.dice_txt()}\n> {self.min_txt()}\n> {self.max_txt()}\n> {self.mean_txt()}"
+		return f"{self.name_txt()}\n> {self.min_txt()}\n> {self.max_txt()}\n> {self.mean_txt()}\n> {self.std_txt()}"
 	def print(self, before: str="", after: str=""): print(before + self.text() + after)
 	def min_txt(self):  return f"Minimum: {self.get_min()}"
 	def max_txt(self):  return f"Maximum: {self.get_max()}"

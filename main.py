@@ -1,33 +1,30 @@
-from DieStats import DieStats
 import matplotlib.pyplot as plt
+from DieStats import DieStats
 
-a_base = DieStats((1, 20), 5, 'attack')
-a_sharp = a_base - 5
+mode = "PF2e"
 
+e_Level = 20
+e_Skill = 38
+e_AC = 45
+e_SaveH = 36
+e_SaveM = 33
+e_SaveL = 30
+e_HP = 470
+e_Strike = 38
+e_SpellSave = 42
+e_SpellStrike = 34
 
-d_base = DieStats((2,6), (1,8), 3, 'damage')
-d_base_2 = d_base.scalar_multiply(2, False, 'crit damage')
-d_sharp = d_base + 10
-d_sharp_2 = d_sharp.scalar_multiply(2, False, 'crit damage')
+f_Level = 20
+f_AC = 44
+f_HP = 288
+f_Strike = 34
+f_StrikeInt = 36
+f_SpellSave = 36
+f_SpellStrike = 26
 
+compLbow = DieStats((4,8), (5,6), 7, "Composite Longbow")
+compLbow_C = DieStats.sum(compLbow*2, DieStats((1,6),"bleed"), "Composite Longbow Critical")
 
-print()
-c = a_base.if_then([12,25], [0, d_base, d_base_2], "attack c")
-c_range = range(c.get_min(), c.get_max()+1)
-print(c.text())
-#print(c.get_pmf())
-
-print()
-d = a_sharp.if_then([12,20], [0, d_sharp, d_sharp_2], "attack d")
-d_range = range(d.get_min(), d.get_max()+1)
-print(d.text())
-#print(d.get_pmf())
-
-print()
-e = d-c
-e_range = range(e.get_min(), e.get_max()+1)
-#print(e.text())
-#print(e.get_pmf())
-
-plt.plot(c_range, c.get_pmfnorm(), d_range, d.get_pmfnorm())#, e_range, e.get_pmfnorm())
-plt.show()
+meteorSwarm_F = DieStats((6,10), (14,6), "Meteor Swarm")
+meteorSwarm_CF = meteorSwarm_F*2
+meteorSwarm_S = meteorSwarm_F//2
