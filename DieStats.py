@@ -5,7 +5,6 @@ class DieStats:
 	# _dice = {1: 0}
 	# _mass = 1
 	# _min = 0
-	# _name = None
 	# _pmf = np.ones(1, dtype=int)
 	# _var = 0
 
@@ -16,10 +15,6 @@ class DieStats:
 		self._min  = kwargs.get("min",  0)
 		self._pmf  = kwargs.get("pmf",  np.ones(1, dtype=int))
 		self._var  = kwargs.get("var",  0)
-		self._name = kwargs.get("name", None)
-		if self._name is str:
-			self._name = self._name.strip()
-			if self._name == "": self._name = None
 		if len(args) == 0: return
 
 		def add_dice(count:int, sides:int=1):
@@ -79,34 +74,25 @@ class DieStats:
 		if self._name is None: raise ValueError("You must name a new roll.")
 	#	end __init__
 
-	def copy(self, name: str=None):
-		if name is None: name = f"{self._name} (copy)"
-		return DieStats(**self._get(name=0, default=1), name=name)
+	def copy(self):
+		return DieStats(**self._get(default=1))
 
-	def set(self, 
-					avg: int=None, dice: dict=None, mass: int=None, min: int=None, 
-					name: str=None, pmf: np.array=None, var: float=None):
+	def set(self, avg: int=None, dice: dict=None, mass: int=None, min: int=None, pmf: np.array=None, var: float=None):
 		if avg  is not None: self._avg  = avg
 		if dice is not None: self._dice = dice
 		if mass is not None: self._mass = mass
 		if min  is not None: self._min  = min
-		if name is not None:
-			if len(name) == 0: self._name = None
-			else: self._name = name
 		if pmf  is not None: self._pmf  = pmf
 		if var  is not None: self._var  = var
 		return self	#End set
-	def _get(self, default: bool=None, 
-					avg: bool=None, dice: bool=None, mass: bool=None, min: bool=None, 
-					name: bool=None, pmf: bool=None, var: bool=None):
-		if None is default is avg is dice is mass is min is name is pmf is var:
-			avg, dice, mass, min, name, pmf, var = 1,1,1,1,1,1,1
+	def _get(self, default: bool=None, avg: bool=None, dice: bool=None, mass: bool=None, min: bool=None, pmf: bool=None, var: bool=None):
+		if None is default is avg is dice is mass is min is pmf is var:
+			avg, dice, mass, min, pmf, var = 1,1,1,1,1,1
 		send = {}
 		if avg  or (avg  is None and default): send["avg"]  = self._avg
 		if dice or (dice is None and default): send["dice"] = self._dice.copy()
 		if mass or (mass is None and default): send["mass"] = self._mass
 		if min  or (min  is None and default): send["min"]  = self._min
-		if name or (name is None and default): send["name"] = self._name
 		if pmf  or (pmf  is None and default): send["pmf"]  = self._pmf.copy()
 		if var  or (var  is None and default): send["var"]  = self._var
 		return send
@@ -136,15 +122,12 @@ class DieStats:
 		dice = {1:0}
 		mass = 1
 		min = 0
-		name = ""
 		pmf  = np.ones(1, dtype=int)
 		var  = 0
 
 		roll_count = 0
 		for arg in args:
-			if isinstance(arg, str) and name == "":
-				name = arg.strip()
-			elif isinstance(arg, int):
+			if isinstance(arg, int):
 				avg += arg
 				min += arg
 				dice[1] += arg
@@ -156,30 +139,24 @@ class DieStats:
 				pmf = np.convolve(pmf, arg._pmf)
 				var += arg.get_var()
 				roll_count += 1
-		if name == "": name = f"Sum of {roll_count} rolls"
-		return DieStats(avg=avg, dice=dice, mass=mass, min=min, name=name, pmf=pmf, var=var)	#End sum
-	def __add__( self, other):
-		return self.sum(other, f"{self}+{other}")
-	def __radd__(self, other):
-		return self.sum(other, f"{self}+{other}")
+		return DieStats(avg=avg, dice=dice, mass=mass, min=min, pmf=pmf, var=var)	#End sum
+	def __add__( self, other): return self.sum(other)
+	def __radd__(self, other): return self.sum(other)
 	def __iadd__(self, other):
-		self = self.sum(other, self._name)
+		self = self + other
 		return self
-	def __sub__( self, other):
-		return self.sum(-other, f"{self}-{other}")
-	def __rsub__(self, other):
-		return (-self).sum(other, f"{other}-{self}")
+	def __sub__( self, other): return self.sum(-other)
+	def __rsub__(self, other): return (-self).sum(other)
 	def __isub__(self, other):
-		self = self.sum(-other, self._name)
+		self = self - other
 		return self
 
-	def scalar_multiply(self, count:int, mult_const:bool=None, roll_new:bool=None, name:str=None):
+	def scalar_multiply(self, count:int, mult_const:bool=None, roll_new:bool=None):
 		if mult_const is None: mult_const = True
 		if roll_new is None: roll_new = True
-		if name is None: name = self._name
-		if count == 0: return DieStats(name=name)
+		if count == 0: return DieStats()
 		if count < 0:
-			self = self.__neg__(name=name)
+			self = -self
 			count = -count
 		if count == 1: return self
 
@@ -203,32 +180,28 @@ class DieStats:
 				pmf[count*i] = self._pmf[i]
 			var = self.get_var() * count**2
 
-		return DieStats(avg=avg, dice=dice, mass=mass, min=min, name=name, pmf=pmf, var=var)
-	def __mul__( self, other):
-		return self.scalar_multiply(other)
-	def __rmul__(self, other):
-		return self.scalar_multiply(other)
+		return DieStats(avg=avg, dice=dice, mass=mass, min=min, pmf=pmf, var=var)
+	def __mul__( self, other): return self.scalar_multiply(other)
+	def __rmul__(self, other): return self.scalar_multiply(other)
 	def __imul__(self, other):
-		self = self.scalar_multiply(other)
+		self = self*other
 		return self
 
 	def roll(self, count:int):
 		if not isinstance(count, int): return NotImplemented
 		rng = np.random.default_rng()
 		return rng.choice(np.arange(self._min, self._min+len(self._pmf)), count, p=self.get_pmfnorm())
-	def __matmul__( self, count):
-		return self.roll(count)
-	def __rmatmul__(self, count):
-		return self.roll(count)
-	def __imatmul__(self, other):return NotImplemented
+	def __matmul__( self, count): return self.roll(count)
+	def __rmatmul__(self, count): return self.roll(count)
+	def __imatmul__(self, other): return NotImplemented
 
-	# def __truediv__(self, other): return NotImplemented
-	def __floordiv__(self, other):
-		self = self.copy()
-		self._min //= other
+	def __truediv__(self, other): return NotImplemented
+	def __floordiv__(self, other): return NotImplemented
+		# self = self.copy()
+		# self._min //= other
 		
 		
-	# def __mod__(self, other): return NotImplemented					#odds of rolling a specific number
+	 def __mod__(self, other): return self == other		#odds of rolling a specific number
 	# def __divmod__(self, other): return NotImplemented
 	# def __pow__(self, other, modulo): return NotImplemented
 	# def __lshift__(self, other): return NotImplemented
@@ -237,26 +210,22 @@ class DieStats:
 	# def __xor__(self, other): return NotImplemented
 	# def __or__(self, other): return NotImplemented
 
-	def __neg__(self, name:str=None):
+	def __neg__(self):
 		dice = {1: -self._dice[1]}
 		for key in self._dice: dice[-key] = self._dice[key]
 		del dice[-1]
 
-		if name is None: name = self._name
 		min = -self.get_max()
 		pmf=self._pmf[::-1]
 
-		return self.copy(name).set(dice=dice, min=min, pmf=pmf)
-	def __pos__(self, name:str=None): return NotImplemented
+		return self.copy().set(dice=dice, min=min, pmf=pmf)
+	def __pos__(self): return NotImplemented
 
 
-	def __len__(self):
-		return len(self._pmf)
+	def __len__(self): return len(self._pmf)
 
-	def __int__(self):
-		return int(np.ceil(self.__float__()))
-	def __float__(self):
-		return self.get_avg()
+	def __int__(self): return int(np.ceil(self.__float__()))
+	def __float__(self): return self.get_avg()
 
 	def __round__(self, direction="down"):
 		if isinstance(direction, str):
@@ -275,14 +244,20 @@ class DieStats:
 
 	def __lt__(self, other):
 		if isinstance(other, int):
-			if self.__ceil__()  <  other: return 1
-			if self.__floor__() >= other: return 0
+			if self.get_max() <  other: return 1
+			if self.get_min() >= other: return 0
 
 			pmf = self.get_pmf()
 			chances = 0
 			for i in range(other - self.__floor__()):
 				chances += pmf[i]
 			return chances/self.get_mass()
+			
+		elif isinstance(other, DieStats):
+			if self.get_max() <  other.get_min(): return 1
+			if self.get_min() >= other.get_max(): return 0
+			
+			return: NotImplemented
 		else:
 			return NotImplemented
 	def __le__(self, other):
@@ -315,7 +290,7 @@ class DieStats:
 		condition [optional]: A list of strictly decreasing integers.
 		name [optional]: A string to name the resulting roll object.
 
-		The output list must be the same length as the condition list or exactly 1 longer. If they are the same length, the output if all conditions are false will default to 0, otherwise the final element of output will be used.
+		The output list must be the same length as the condition list or exactly 1 longer. If they are the same length and all conditions are evaluated as false the return will 0, otherwise the final element of output will be returned.
 
 		If output is given but not condition, it should instead be in the form of a list of (output, condition) tuples; again, with the conditions in strictly decreasing order. If all tuples contain 2 elements, then the all false condition output will default to 0, otherwise, if the final tuple only contains 1 element (output,), this final value will be used.
 		"""
@@ -333,22 +308,22 @@ class DieStats:
 			if not isinstance(output[c], DieStats):
 				output[c] = DieStats("temp", output[c])
 
-		for c in range(cond_cnt): # Normalize conditions by effectively setting _min to 0
-			condition[c] = condition[c] - self.get_min()
+		# for c in range(cond_cnt): # Normalize conditions by effectively setting _min to 0
+		# 	condition[c] = condition[c] - self.get_min()
 		counts = np.zeros(cond_cnt, dtype=int) # Keep track of how many ways to get each output
 
-		c = 0
+		c = 0 # Current condition evluation
 		for i in range(len(self)-1, -1, -1): # Iterate through possible rolls high->low
-			while i + self.get_min() < condition[c]: c += 1 # If no possibility of meeting condition: skip
+			while i + self.get_min() < condition[c]: c += 1 # If fails condition: check next condition
 			counts[c] += self._pmf[i] # Add pmf to counts
 		del c
 
-		weights = np.zeros(cond_cnt, dtype=int) # The multiplier for each output's pmf
-		for c in range(cond_cnt):
-			weights[c] = output[c].get_mass() # Set weights to the total mass of each output
-		lcm = np.lcm.reduce(weights) # Find lcm of all weights
-		weights = lcm // weights * counts
-		weights //= np.gcd.reduce(weights)
+		# weights = np.ones(cond_cnt, dtype=int) # The multiplier for each output's pmf
+		# for c in range(cond_cnt):
+		# 	weights[c] = output[c].get_mass() # Set weights to the total mass of each output
+		# lcm = np.lcm.reduce(weights) # Find lcm of all weights
+		# weights = lcm // weights * counts
+		# weights //= np.gcd.reduce(weights)
 
 		max_, min_ = np.NINF, np.inf
 		for c in range(cond_cnt):
@@ -365,7 +340,7 @@ class DieStats:
 			if counts[c] == 0: continue # If this condition was never met
 			offset = output[c].get_min() - min_
 			for i in range(len(output[c])):
-				weight = output[c]._pmf[i] * weights[c]
+				weight = output[c]._pmf[i] #* weights[c]
 				pmf[i + offset] += weight
 				mass += weight
 				avg += weight * (i + offset)
@@ -385,7 +360,7 @@ class DieStats:
 	def var_txt(self):  return f"Variance: {self.get_var()}"
 	def std_txt(self):  return f"Standard deviation: {self.get_sigma()}"
 	def dice_txt(self): return f"Dice: {self.get_dice()}"
-	def pmf_txt(self):  return f"PMF of possible values (bounds: [{self.get_min()}, {self.get_max()}]):\n{self.get_pmf()}"
+	def pmf_txt(self):  return f"PMF of possible values (bounds: [{self.get_min()}, {self.get_max()}]):/n{self.get_pmf()}"
 	def pdf_txt(self):  return f"PDF of possible values, 1st element is P(min):\n{self.get_pmfnorm()}"
 	def mass_txt(self): return f"Number of possibilities: {self.get_mass()}"
 	def name_txt(self): return f"{self._name}:"

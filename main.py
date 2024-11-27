@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from DieStats import DieStats
 
 mode = "PF2e"
