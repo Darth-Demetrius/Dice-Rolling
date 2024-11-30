@@ -48,12 +48,6 @@ class DieStats:
 		while len(args) > 0:
 			x = args.pop(0)
 
-			if isinstance(x, str):
-				if self._name is not None: raise ValueError("You cannot set the name more than once.")
-				x = x.strip()
-				if x == "": raise ValueError("You cannot set a blank name.")
-				self._name = x
-				continue
 			if isinstance(x, int):
 				if len(args) > 0 and isinstance(args[0], int): add_dice(x, args.pop(0))
 				else: add_dice(x)
@@ -70,14 +64,12 @@ class DieStats:
 					add_dice(x[0], x[1])
 					continue
 				raise TypeError("Tuple arguments must be in to form of (die, count)")
-			raise TypeError("Arguments must be integers, dictionaries, tuples, or a string.")
-		if self._name is None: raise ValueError("You must name a new roll.")
+			raise TypeError("Arguments must be integers, dictionaries, or, tuples.")
 	#	end __init__
 
-	def copy(self):
-		return DieStats(**self._get(default=1))
+	def copy(self): return DieStats(**self._get(default=1))
 
-	def set(self, avg: int=None, dice: dict=None, mass: int=None, min: int=None, pmf: np.array=None, var: float=None):
+	def set(self, avg:int=None, dice:dict=None, mass:int=None, min:int=None, pmf:np.array=None, var:float=None):
 		if avg  is not None: self._avg  = avg
 		if dice is not None: self._dice = dice
 		if mass is not None: self._mass = mass
@@ -85,7 +77,8 @@ class DieStats:
 		if pmf  is not None: self._pmf  = pmf
 		if var  is not None: self._var  = var
 		return self	#End set
-	def _get(self, default: bool=None, avg: bool=None, dice: bool=None, mass: bool=None, min: bool=None, pmf: bool=None, var: bool=None):
+	def _get(self, default:bool=None, 
+				avg:bool=None, dice:bool=None, mass:bool=None, min:bool=None, pmf:bool=None, var:bool=None):
 		if None is default is avg is dice is mass is min is pmf is var:
 			avg, dice, mass, min, pmf, var = 1,1,1,1,1,1
 		send = {}
@@ -97,24 +90,15 @@ class DieStats:
 		if var  or (var  is None and default): send["var"]  = self._var
 		return send
 
-	def get_avg(self):
-		return self._avg
-	def get_dice(self):
-		return self._dice.copy()
-	def get_mass(self):
-		return self._mass
-	def get_max(self):
-		return self._min + len(self._pmf) - 1
-	def get_min(self):
-		return self._min
-	def get_pmf(self):
-		return self._pmf.copy()
-	def get_pmfnorm(self):
-		return self._pmf/self.get_mass()
-	def get_sigma(self):
-		return np.sqrt(self.get_var())
-	def get_var(self):
-		return self._var
+	def get_avg(self):	return self._avg
+	def get_dice(self):	return self._dice.copy()
+	def get_mass(self):	return self._mass
+	def get_max(self):	return self._min + len(self._pmf) - 1
+	def get_min(self):	return self._min
+	def get_pmf(self):	return self._pmf.copy()
+	def get_pmfnorm(self): return self._pmf/self.get_mass()
+	def get_sigma(self): return np.sqrt(self.get_var())
+	def get_var(self):	return self._var
 
 
 	def sum(*args):
@@ -201,7 +185,7 @@ class DieStats:
 		# self._min //= other
 		
 		
-	 def __mod__(self, other): return self == other		#odds of rolling a specific number
+	def __mod__(self, other): return self == other		#odds of rolling a specific number
 	# def __divmod__(self, other): return NotImplemented
 	# def __pow__(self, other, modulo): return NotImplemented
 	# def __lshift__(self, other): return NotImplemented
@@ -219,7 +203,7 @@ class DieStats:
 		pmf=self._pmf[::-1]
 
 		return self.copy().set(dice=dice, min=min, pmf=pmf)
-	def __pos__(self): return NotImplemented
+	def __pos__(self): return self
 
 
 	def __len__(self): return len(self._pmf)
@@ -235,12 +219,9 @@ class DieStats:
 		if direction < 0: return self.__trunc__()
 		if direction > 0: return self.__int__()
 		return self.__float__() # direction == 0
-	def __trunc__(self):
-		return int(self.__float__())
-	def __floor__(self):
-		return self.get_min()
-	def __ceil__(self):
-		self.get_max()
+	def __trunc__(self): return int(self.__float__())
+	def __floor__(self): return self.get_min()
+	def __ceil__(self): self.get_max()
 
 	def __lt__(self, other):
 		if isinstance(other, int):
@@ -257,7 +238,7 @@ class DieStats:
 			if self.get_max() <  other.get_min(): return 1
 			if self.get_min() >= other.get_max(): return 0
 			
-			return: NotImplemented
+			return NotImplemented
 		else:
 			return NotImplemented
 	def __le__(self, other):
@@ -283,21 +264,21 @@ class DieStats:
 		return 1 - self.__eq__(other)
 
 
-	def conditional_roll(in_check, output:list, condition:list=None, name:str=None):
+	def conditional_roll(in_check, output:list, condition:list=None):
 		"""
 		in_check: A roll object to be compared against the condition list.
 		output: A list of resulting roll (or roll-like) objects to be rolled if the corresponding condition is met or exeeded.
 		condition [optional]: A list of strictly decreasing integers.
-		name [optional]: A string to name the resulting roll object.
 
 		The output list must be the same length as the condition list or exactly 1 longer. If they are the same length and all conditions are evaluated as false the return will 0, otherwise the final element of output will be returned.
 
 		If output is given but not condition, it should instead be in the form of a list of (output, condition) tuples; again, with the conditions in strictly decreasing order. If all tuples contain 2 elements, then the all false condition output will default to 0, otherwise, if the final tuple only contains 1 element (output,), this final value will be used.
 		"""
 
-		self = in_check.copy(name)
+		self = in_check.copy()
 		if condition is None:
-			if len(output[-1]) == 1: output[-1] += (np.NINF,)
+			if len(output[-1]) == 1:
+				output[-1] += (np.NINF,)
 			output, condition = map(list, zip(*output))
 		if condition[-1] != np.NINF:
 			condition.append(np.NINF)
@@ -306,7 +287,7 @@ class DieStats:
 		cond_cnt = len(output)
 		for c in range(cond_cnt): # Ensure all outputs are DieStats
 			if not isinstance(output[c], DieStats):
-				output[c] = DieStats("temp", output[c])
+				output[c] = DieStats(output[c])
 
 		# for c in range(cond_cnt): # Normalize conditions by effectively setting _min to 0
 		# 	condition[c] = condition[c] - self.get_min()
@@ -332,7 +313,7 @@ class DieStats:
 				min_ = min(min_, output[c].get_min())
 
 		if max_ == np.NINF:# If no conditions were met: return blank roll
-			return DieStats(name = name)
+			return DieStats()
 			
 		pmf = np.zeros(max_ - min_ + 1, dtype=int)
 		mass, avg = 0, 0
@@ -347,12 +328,11 @@ class DieStats:
 		avg = avg/mass + min_
 		var = np.var(pmf)
 
-		return DieStats(avg=avg, mass=mass, min=min_, name=name, pmf=pmf, var=var)
+		return DieStats(avg=avg, mass=mass, min=min_, pmf=pmf, var=var)
 
 
-	def __str__(self): return self._name
-	def text(self):
-		return f"{self.name_txt()}\n> {self.min_txt()}\n> {self.max_txt()}\n> {self.mean_txt()}\n> {self.std_txt()}"
+	def __str__(self):	return NotImplemented
+	def text(self):			return f"{self.min_txt()}\n> {self.max_txt()}\n> {self.mean_txt()}\n> {self.std_txt()}"
 	def print(self, before: str="", after: str=""): print(before + self.text() + after)
 	def min_txt(self):  return f"Minimum: {self.get_min()}"
 	def max_txt(self):  return f"Maximum: {self.get_max()}"
@@ -360,7 +340,7 @@ class DieStats:
 	def var_txt(self):  return f"Variance: {self.get_var()}"
 	def std_txt(self):  return f"Standard deviation: {self.get_sigma()}"
 	def dice_txt(self): return f"Dice: {self.get_dice()}"
-	def pmf_txt(self):  return f"PMF of possible values (bounds: [{self.get_min()}, {self.get_max()}]):/n{self.get_pmf()}"
+	def pmf_txt(self):
+		return f"PMF of possible values (bounds: [{self.get_min()}, {self.get_max()}]):/n{self.get_pmf()}"
 	def pdf_txt(self):  return f"PDF of possible values, 1st element is P(min):\n{self.get_pmfnorm()}"
 	def mass_txt(self): return f"Number of possibilities: {self.get_mass()}"
-	def name_txt(self): return f"{self._name}:"

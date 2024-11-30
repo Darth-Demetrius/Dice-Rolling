@@ -22,9 +22,9 @@ f_StrikeInt = 36
 f_SpellSave = 36
 f_SpellStrike = 26
 
-compLbow = DieStats((4,8), (5,6), 7, "Composite Longbow")
-compLbow_C = DieStats.sum(compLbow*2, DieStats((1,6),"bleed"), "Composite Longbow Critical")
+compLbow = DieStats((4,8), (5,6), 7)
+compLbow_C = DieStats.sum(compLbow*2, DieStats((1,6)))
 
-meteorSwarm_F = DieStats((6,10), (14,6), "Meteor Swarm")
+meteorSwarm_F = DieStats((6,10), (14,6))
 meteorSwarm_CF = meteorSwarm_F*2
 meteorSwarm_S = meteorSwarm_F//2
