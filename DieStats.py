@@ -7,14 +7,14 @@ class Mode(StrEnum):
     SCALE = "scale"
 
 class DieStats:
-    # _avg = 0
-    # _dice = {1: 0}
-    # _mass = 1
-    # _min = 0
-    # _mod = False
-    # _mode = Mode.TIMES | Mode.SCALE
-    # _pmf = np.ones(1, dtype=int)
-    # _var = 0
+    # _avg: float = 0
+    # _dice: dict[int, int] = {1: 0}
+    # _mass: int = 1
+    # _min: int = 0
+    # _mod: bool = False
+    # _mode: Mode = Mode.TIMES | Mode.SCALE
+    # _pmf: np.ndarray = np.ones(1, dtype=int)
+    # _var: int = 0
 
     def __init__(self, *args, **kwargs):
         """
@@ -31,7 +31,7 @@ class DieStats:
                 - dice (dict): Dictionary mapping sides to count (default: {1:0})
                 - mass (int): Total probability mass (default: 1)
                 - min (int): Minimum possible roll value (default: 0)
-                - mod (bool): Modified flag (default: False)
+                - mod (bool): Modified flag, if set then the dice dict is not accurate (default: False)
                 - mode (Mode): Multiplication mode (Mode.TIMES or Mode.SCALE, default: Mode.TIMES)
                 - pmf (np.ndarray): Probability mass function (default: [1])
                 - var (int): Variance of the distribution (default: 0)
@@ -306,7 +306,6 @@ class DieStats:
         return self.copy()._set(dice=dice, min=min, pmf=pmf)
     def __pos__(self): return self
 
-
     def __len__(self): return len(self.get_pmf())
 
     def __int__(self): return int(np.ceil(self.__float__()))
@@ -363,72 +362,63 @@ class DieStats:
     def __ne__(self, other): # type: ignore
         return 1 - self.__eq__(other)
 
-
-    def conditional_roll(self, output:list, condition:list | None=None):
+    def conditional_roll(self, checks: list[tuple]):
         """
-        output: A list of resulting roll (or roll-like) objects to be rolled if the corresponding condition is met or exeeded.
-        condition [optional]: A list of strictly decreasing integers.
+        Build a new distribution by selecting one output distribution per roll outcome.
 
-        The output list must be the same length as the condition list or exactly 1 longer. If they are the same length and all conditions are evaluated as false the return will 0, otherwise the final element of output will be returned.
+        Args:
+            checks: A list of tuples `(output, threshold)` in ascending threshold order.
+                For each roll outcome, the output whose threshold is the highest one <= that
+                outcome is used. Tuple `(output,)` with no threshold defaults to -inf.
+                If out of order, will be sorted with a warning.
 
-        If output is given but not condition, it should instead be in the form of a list of (output, condition) tuples; again, with the conditions in strictly decreasing order. If all tuples contain 2 elements, then the all false condition output will default to 0, otherwise, if the final tuple only contains 1 element (output,), this final value will be used.
+        Returns:
+            DieStats: The weighted mixture of branch output distributions.
         """
 
-        self = self.copy()
-        if condition is None:
-            if len(output[-1]) == 1:
-                output[-1] += (-np.inf,)
-            output, condition = map(list, zip(*output))
-        if condition[-1] != -np.inf:
-            condition.append(-np.inf)
-        if len(condition) > len(output):
-            output.append(0)
-        cond_cnt = len(output)
-        for c in range(cond_cnt): # Ensure all outputs are DieStats
-            if not isinstance(output[c], DieStats):
-                output[c] = DieStats(output[c])
+        # Convert checks to (DieStats, threshold) pairs.
+        outputs = []
+        thresholds = []
+        for output_spec, *threshold_spec in checks:
+            dist = output_spec if isinstance(output_spec, DieStats) else DieStats(output_spec)
+            thresh = float(threshold_spec[0]) if threshold_spec else -np.inf
+            outputs.append(dist)
+            thresholds.append(thresh)
 
-        # for c in range(cond_cnt): # Normalize conditions by effectively setting _min to 0
-        #     condition[c] = condition[c] - self.get_min()
-        counts = np.zeros(cond_cnt, dtype=int) # Keep track of how many ways to get each output
+        # Sort checks if out of order.
+        thresholds_arr = np.asarray(thresholds, dtype=float)
+        if not np.all(thresholds_arr[:-1] <= thresholds_arr[1:]):
+            warnings.warn("checks not in ascending threshold order; sorting.")
+            sort_idx = np.argsort(thresholds_arr)
+            outputs = [outputs[i] for i in sort_idx]
+            thresholds_arr = thresholds_arr[sort_idx]
 
-        c = 0 # Current condition evluation
-        for i in range(len(self)-1, -1, -1): # Iterate through possible rolls high->low
-            while i + self.get_min() < condition[c]: c += 1 # If fails condition: check next condition
-            counts[c] += self._pmf[i] # Add pmf to counts
-        del c
+        # Map roll values to output checks using highest qualifying threshold.
+        roll_values = np.arange(self.get_min(), self.get_max() + 1)
+        branch_idx = np.searchsorted(thresholds_arr, roll_values, side='right') - 1
+        branch_weights = np.bincount(branch_idx, weights=self._pmf, minlength=len(outputs)).astype(np.int64)
 
-        # weights = np.ones(cond_cnt, dtype=int) # The multiplier for each output's pmf
-        # for c in range(cond_cnt):
-        #     weights[c] = output[c].get_mass() # Set weights to the total mass of each output
-        # lcm = np.lcm.reduce(weights) # Find lcm of all weights
-        # weights = lcm // weights * counts
-        # weights //= np.gcd.reduce(weights)
-
-        max_, min_ = -np.inf, np.inf
-        for c in range(cond_cnt):
-            if counts[c] > 0: # If there is at least one case this condition was met
-                max_ = max(max_, output[c].get_max())
-                min_ = min(min_, output[c].get_min())
-
-        if max_ == -np.inf:# If no conditions were met: return blank roll
+        # Find active checks and their bounds.
+        active = np.flatnonzero(branch_weights)
+        if active.size == 0:
             return DieStats()
 
-        pmf = np.zeros(int(max_ - min_ + 1), dtype=int)
-        mass, avg = 0, 0
-        for c in range(cond_cnt):
-            if counts[c] == 0: continue # If this condition was never met
-            offset = output[c].get_min() - min_
-            for i in range(len(output[c])):
-                weight = output[c]._pmf[i] #* weights[c]
-                pmf[i + offset] += weight
-                mass += weight
-                avg += weight * (i + offset)
-        avg = avg/mass + min_
-        var = np.var(pmf)
+        min_val = min(outputs[i].get_min() for i in active)
+        max_val = max(outputs[i].get_max() for i in active)
 
-        return DieStats(avg=avg, mass=mass, min=min_, pmf=pmf, var=var)
+        # Combine PMFs from active checks weighted by their counts.
+        pmf = np.zeros(max_val - min_val + 1, dtype=np.int64)
+        for i in active:
+            offset = outputs[i].get_min() - min_val
+            pmf[offset:offset + len(outputs[i])] += outputs[i]._pmf * branch_weights[i]
 
+        # Compute statistics.
+        mass = int(pmf.sum())
+        support = np.arange(min_val, max_val + 1)
+        avg = float(np.dot(pmf, support) / mass)
+        var = float(np.dot(pmf, (support - avg) ** 2) / mass)
+
+        return DieStats(avg=avg, mass=mass, min=min_val, mod=True, pmf=pmf, var=var)
 
     def __str__(self):  return NotImplemented
     def __repr__(self): return f"DieStats(avg={self._avg}, dice={self._dice}, mass={self._mass}, min={self._min}, pmf={self._pmf}, var={self._var})"
