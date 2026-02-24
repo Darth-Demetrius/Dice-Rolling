@@ -2,9 +2,14 @@
 
 ## Backus-Naur Form
 
-<dice-expression> ::= <count-opt> <d-separator> <sides>
-<count-opt> ::= <signed-integer> | ε
-<sides> ::= <integer>
+<expression> ::= <sum>
+<sum> ::= <product> | <sum> "+" <product> | <sum> "-" <product>
+<product> ::= <dice> | <product> "*" <dice> | <product> "/" <dice>
+<dice> ::= <power> | <dice> <d-separator> <power>
+<power> ::= <unary> | <unary> "^" <power>
+<unary> ::= <primary> | "+" <unary> | "-" <unary> | <d-separator> <unary>
+<primary> ::= <integer> | "(" <expression> ")"
+
 <d-separator> ::= "d" | "D"
 
 ## Lexical Rules
@@ -16,6 +21,7 @@
 ## Notes
 
 - Whitespace may appear between tokens.
-- Input must match exactly one <dice-expression>.
-- Semantic rule: if <count-opt> is omitted, <count> defaults to 1.
-- Semantic constraint: <count> may be any integer; <sides> must be >= 0.
+- Input must match exactly one <expression>.
+- Operator precedence (high to low): unary `d`, unary `+/-`, `^`, binary `d`, `*`/`/`, `+`/`-`.
+- `d20` is equivalent to `1d20`.
+- Semantic constraint: right operand of binary `d` (dice sides) must be >= 0.

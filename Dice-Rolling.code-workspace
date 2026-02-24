@@ -5,8 +5,23 @@
 		}
 	],
 	"settings": {
+		"python.defaultInterpreterPath": "/home/jacobk/Documents/Code Workspaces/Dice-Rolling/.venv/bin/python",
+		"python.terminal.activateEnvironment": true,
 		"chat.tools.terminal.autoApprove": {
-			"/bin/python": true
+
+			"/bin/python": true,
+			"timeout": true,
+			"true": true
+		},
+		"terminal.integrated.env.linux": {
+			"VIRTUAL_ENV": "/home/jacobk/Documents/Code Workspaces/Dice-Rolling/.venv",
+			"PATH": "/home/jacobk/Documents/Code Workspaces/Dice-Rolling/.venv/bin:${env:PATH}"
+		},
+		"terminal.integrated.shellIntegration.environmentReporting": true,
+		"launch": {
+
+			"configurations": [],
+			"compounds": []
 		}
 	}
 }
