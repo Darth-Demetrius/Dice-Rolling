@@ -1,15 +1,10 @@
 {
+	"python.defaultInterpreterPath": ".venv/bin/python",
 	"python-envs.pythonProjects": [
 		{
 			"path": ".",
 			"envManager": "ms-python.python:venv",
 			"packageManager": "ms-python.python:pip"
 		}
-	],
-	"python.defaultInterpreterPath": "/home/jacobk/Documents/Code Workspaces/Dice-Rolling/.venv/bin/python",
-	"python.terminal.activateEnvironment": true,
-	"terminal.integrated.env.linux": {
-		"VIRTUAL_ENV": "/home/jacobk/Documents/Code Workspaces/Dice-Rolling/.venv",
-		"PATH": "/home/jacobk/Documents/Code Workspaces/Dice-Rolling/.venv/bin:${env:PATH}"
-	}
+	]
 }
