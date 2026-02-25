@@ -1,3 +1,4 @@
+import math
 import pytest
 
 from safe_repl import safe_exec, Permissions
@@ -5,7 +6,11 @@ from safe_repl import safe_exec, Permissions
 
 def safe_exec_standard(line: str, variables: dict[str, object]) -> object | None:
     """Helper to call safe_exec with STANDARD permission level (used for most tests)."""
-    return safe_exec(line, variables, Permissions.STANDARD)
+    # Build globals with math module available (note: tests use math.sqrt() syntax)
+    perms = Permissions(base="STANDARD")
+    globals_dict = perms.build_custom_globals()
+    globals_dict["math"] = math  # Provide math module for tests
+    return safe_exec(line, variables, perms, globals_dict)
 
 
 def test_safe_exec_returns_expression_value() -> None:
