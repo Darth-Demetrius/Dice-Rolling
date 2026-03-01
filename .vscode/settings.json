@@ -1,5 +1,12 @@
 {
 	"python-envs.defaultEnvManager": "ms-python.python:system",
 	"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
-	"python.terminal.activateEnvironment": true
+	"python.terminal.activateEnvironment": true,
+	"python-envs.pythonProjects": [
+		{
+			"path": ".",
+			"envManager": "ms-python.python:system",
+			"packageManager": "ms-python.python:pip"
+		}
+	]
 }
