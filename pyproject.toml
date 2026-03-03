@@ -32,6 +32,8 @@ pytest = "^8.3.5"
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md
 useLibraryCodeForTypes = true
+stubPath = "typings"
+reportAttributeAccessIssue = "none"
 
 [tool.ruff]
 # https://beta.ruff.rs/docs/configuration/

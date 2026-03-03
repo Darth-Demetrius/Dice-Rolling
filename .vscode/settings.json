@@ -8,5 +8,7 @@
 			"envManager": "ms-python.python:system",
 			"packageManager": "ms-python.python:pip"
 		}
-	]
+    ],
+    "editor.detectIndentation": false,
+    "editor.insertSpaces": true
 }

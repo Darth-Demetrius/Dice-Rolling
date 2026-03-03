@@ -18,6 +18,8 @@
 
 			"configurations": [],
 			"compounds": []
-		}
+		},
+		"editor.detectIndentation": false,
+		"editor.insertSpaces": true
 	}
 }

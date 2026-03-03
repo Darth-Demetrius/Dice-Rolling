@@ -10,8 +10,7 @@ from dyce.h import H
 from dyce.p import P
 
 
-DiceCountMap: TypeAlias = dict[int, int]
-DiceSpec: TypeAlias = DiceCountMap | tuple[int, int] | list["DiceSpec"] | int
+DiceSpec: TypeAlias = dict[int, int] | tuple[int, int] | list["DiceSpec"] | int
 CheckSpec: TypeAlias = tuple["DyceStats | DiceSpec"] | tuple["DyceStats | DiceSpec", float]
 
 
@@ -38,11 +37,11 @@ class DyceStats:
         self,
         *,
         h: H | None = None,
-        dice: DiceCountMap | None = None,
+        dice: dict[int, int] | None = None,
         mode: str | Mode = Mode.TIMES,
     ) -> None:
-        self._h = h if h is not None else self._identity_h()
-        self._dice: DiceCountMap = dict(dice) if dice is not None else {1: 0}
+        self._h = h if h is not None else H({})
+        self._dice: dict[int, int] = dict(dice) if dice is not None else {}
         self._mode: Mode = Mode.TIMES
         self.set_mode(mode)
 
@@ -50,14 +49,6 @@ class DyceStats:
     def from_dice(cls, *specs: DyceStats | DiceSpec, mode: str | Mode = Mode.TIMES) -> "DyceStats":
         """Build a distribution from dice-style inputs."""
         return cls(mode=mode).add_dice(*specs)
-
-    @staticmethod
-    def _identity_h() -> H:
-        return DyceStats._h_from_weights({0: 1})
-
-    @staticmethod
-    def _h_from_weights(weights: DiceCountMap) -> H:
-        return H(weights)  # pyright: ignore[reportArgumentType]
 
     @staticmethod
     def _to_int_outcome(outcome: object) -> int:
@@ -68,7 +59,7 @@ class DyceStats:
         raise TypeError(f"Non-integer outcome {outcome!r} is not supported")
 
     @staticmethod
-    def _normalize_die_map(die: DiceCountMap) -> DiceCountMap:
+    def _normalize_die_map(die: dict[int, int]) -> dict[int, int]:
         (sides, count), = die.items()
 
         if sides == 0 or count == 0:
@@ -83,7 +74,7 @@ class DyceStats:
         return die
 
     @staticmethod
-    def parse_dice(*specs: DyceStats | DiceSpec) -> Iterator[DyceStats | DiceCountMap]:
+    def parse_dice(*specs: DyceStats | DiceSpec) -> Iterator[DyceStats | dict[int, int]]:
         """Yield normalized dice components.
 
         Outputs are either:
@@ -158,10 +149,10 @@ class DyceStats:
     def _die_histogram(sides: int, count: int) -> H:
         """Create a histogram for ``count`` rolls of one die type."""
         if count == 0:
-            return DyceStats._identity_h()
+            return H({})
 
         if sides == 1:
-            return DyceStats._h_from_weights({count: 1})
+            return H({count: 1})  # pyright: ignore[reportArgumentType]
 
         if count < 0:
             sides = -sides
@@ -174,8 +165,8 @@ class DyceStats:
         return (count @ P(single)).h()
 
     @staticmethod
-    def _h_from_dice_dict(dice: DiceCountMap) -> H:
-        total = DyceStats._identity_h()
+    def _h_from_dice_dict(dice: dict[int, int]) -> H:
+        total = H({})
         for sides, count in dice.items():
             total = total + DyceStats._die_histogram(sides, count)
         return total
@@ -211,7 +202,7 @@ class DyceStats:
     def get_mode(self) -> Mode:
         return self._mode
 
-    def get_dice(self) -> DiceCountMap:
+    def get_dice(self) -> dict[int, int]:
         return self._dice.copy()
 
     def get_distribution(self) -> dict[int, float]:
@@ -255,8 +246,8 @@ class DyceStats:
         return DyceStats.from_dice(*specs)
 
     def _reset_identity(self) -> None:
-        self._h = self._identity_h()
-        self._dice = {1: 0}
+        self._h = H({})
+        self._dice = {}
 
     def i_scalar_multiply(self, scalar: int) -> "DyceStats":
         if scalar == 0:
@@ -326,7 +317,7 @@ class DyceStats:
         if not np.any(branch_weights):
             return DyceStats()
 
-        result_weights: DiceCountMap = {}
+        result_weights: dict[int, int] = {}
         for idx in np.flatnonzero(branch_weights):
             branch_weight = int(branch_weights[idx])
             for outcome, weight in outputs[idx]._h.items():
@@ -336,7 +327,7 @@ class DyceStats:
                 outcome_int = self._to_int_outcome(outcome)
                 result_weights[outcome_int] = result_weights.get(outcome_int, 0) + int_weight * branch_weight
 
-        return DyceStats(h=self._h_from_weights(result_weights))
+        return DyceStats(h=H(result_weights))  # pyright: ignore[reportArgumentType]
 
     def __add__(self, other):
         return self.sum(self, other)
@@ -376,7 +367,7 @@ class DyceStats:
         return self.__matmul__(count)
 
     def __neg__(self):
-        neg_dice: DiceCountMap = {}
+        neg_dice: dict[int, int] = {}
         for sides, count in self._dice.items():
             if sides == 1:
                 neg_dice[1] = neg_dice.get(1, 0) - count
