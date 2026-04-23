@@ -1,27 +1,26 @@
-from dyce.h import H
+from dyce.h import H as DyceH
 
 import MyDyce
 
 
-def test_mode_times_swaps_mul_and_matmul_both_directions() -> None:
-    base = H(6)
-    mine = MyDyce.MyH(6)
-
-    MyDyce.set_mode_times()
-
-    assert mine * 2 == base @ 2
-    assert mine @ 2 == base * 2
-    assert 2 * mine == 2 @ base
-    assert 2 @ mine == 2 * base
-
-
-def test_mode_scale_matches_dyce_defaults_both_directions() -> None:
-    base = H(6)
-    mine = MyDyce.MyH(6)
-
-    MyDyce.set_mode_scale()
+def test_h_uses_dyce_default_mul_and_matmul() -> None:
+    base = DyceH(6)
+    mine = MyDyce.H(6)
 
     assert mine * 2 == base * 2
     assert mine @ 2 == base @ 2
     assert 2 * mine == 2 * base
     assert 2 @ mine == 2 @ base
+
+
+def test_exports_h_and_p_types() -> None:
+    h = MyDyce.H(6)
+    p = MyDyce.P(h, h)
+
+    assert isinstance(h, MyDyce.H)
+    assert isinstance(p, MyDyce.P)
+
+
+def test_h_pretty_string_format_for_common_dice_notation() -> None:
+    assert str(MyDyce.H(6)) == "1d6"
+    assert str(2 @ MyDyce.H(6)) == "2d6"
