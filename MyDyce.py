@@ -1,5 +1,6 @@
 
 from enum import Enum, auto
+from operator import __add__
 from typing import Union
 from itertools import groupby
 import re
@@ -20,6 +21,7 @@ import dyce.p as _dyce_p
 __all__ = (
     "H",
     "P",
+    "set_print_mode",
 )
 
 class H(_H):
@@ -31,6 +33,8 @@ class H(_H):
     def __str__(self) -> str:
         # Check if the histogram is of the form [count]d[sides]
         if count := next(iter(self._h), None):
+            if len(self._h) == 1:
+                return str(count)
             sides = (len(self._h)+count-1)/count
             if sides.is_integer() and self == count@H(sides):
                 return f"{int(count)}d{int(sides)}"
@@ -42,6 +46,9 @@ class H(_H):
         if _print_mode != _PrintMode.PRETTY:
             return super().__repr__()
         return f"{type(self).__name__}({str(self)})"
+
+    def reprfull(self) -> str:
+        return super().__repr__()
 
 _dyce_p.H = H
 
@@ -83,15 +90,28 @@ class P(_P):
             return super().__repr__()
         return f"{type(self).__name__}({str(self)})"
 
-    def __add__(self, other):
-        return P(self, other)
+    @beartype
+    def __add__(self, other: _OperandT):
+        if isinstance(other, (P, H)):
+            return P(self, other)
+        if isinstance(other, RealLike):
+            if other.is_integer():
+                other = int(other)  # type: ignore
+            return P(self, H({other: 1}))
+        return super().__add__(other)
     def __radd__(self, other):
-        return P(self, other)
+        return self + other
 
-    def __sub__(self, other):
-        return P(self, -other)
+    def __sub__(self, other: _OperandT):
+        if isinstance(other, (P, H)):
+            return P(self, -other)  # type: ignore
+        if isinstance(other, RealLike):
+            if other.is_integer():
+                other = int(other)  # type: ignore
+            return P(self, H({-other: 1}))
+        return super().__sub__(other)
     def __rsub__(self, other):
-        return P(-self, other)  # type: ignore
+        return (-self) + other  # type: ignore
 
 
 _dyce_p.P = P
@@ -103,3 +123,9 @@ class _PrintMode(Enum):
     PRETTY  = auto()
 
 _print_mode = _PrintMode.PRETTY
+
+def set_print_mode(mode: str) -> None:
+    r"Set the print mode."
+    global _print_mode
+    if isinstance(_print_mode, str):
+        _print_mode = _PrintMode[mode.upper()]
