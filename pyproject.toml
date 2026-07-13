@@ -17,6 +17,9 @@ pytest = "^8.3.5"
 useLibraryCodeForTypes = true
 stubPath = "typings"
 reportAttributeAccessIssue = "none"
+ignore = [
+    ".venv"
+]
 
 [tool.ruff]
 # https://beta.ruff.rs/docs/configuration/

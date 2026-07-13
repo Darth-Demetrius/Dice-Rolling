@@ -1,40 +1,39 @@
 
 from enum import Enum, auto
-from operator import __add__
-from typing import Union
+from typing import Any, Iterable, Literal, TypeAlias, Union, cast
 from itertools import groupby
-import re
+from collections import defaultdict
 
-from numerary.types import RealLike
 from numerary.bt import beartype
-from dyce.h import (
-    H as _H,
-    _OperandT,
-    _SourceT,
-    SupportsInt,
-)
-from dyce.p import (
-    P as _P,
-)
-import dyce.p as _dyce_p
+import dyce
+from dyce.h import SupportsInt
 
 __all__ = (
     "H",
     "P",
+    "R",
+    "_H",
+    "_P",
+    "_R",
+    "_RollLike",
+    "_RollLikes",
+    "_OrderedRollLikes",
     "set_print_mode",
 )
 
-class H(_H):
-    @beartype
-    def __init__(self, items: _SourceT) -> None:
-        r"Initializer."
-        super().__init__(items)
+_H: TypeAlias = dyce.h.H
+_P: TypeAlias = dyce.p.P
+_R: TypeAlias = dyce.r.R
 
+_RollLike: TypeAlias = SupportsInt | _H | _P | _R
+_RollLikes: TypeAlias = dict[str, _RollLike] | list[_RollLike] | set[_RollLike] | tuple[_RollLike, ...]
+
+_OrderedRollLikes: TypeAlias = list[_RollLike | _RollLikes] | tuple[_RollLike | _RollLikes, ...]
+
+class H(dyce.h.H):
     def __str__(self) -> str:
         # Check if the histogram is of the form [count]d[sides]
         if count := next(iter(self._h), None):
-            if len(self._h) == 1:
-                return str(count)
             sides = (len(self._h)+count-1)/count
             if sides.is_integer() and self == count@H(sides):
                 return f"{int(count)}d{int(sides)}"
@@ -47,22 +46,12 @@ class H(_H):
             return super().__repr__()
         return f"{type(self).__name__}({str(self)})"
 
-    def reprfull(self) -> str:
-        return super().__repr__()
 
-_dyce_p.H = H
-
-
-class P(_P):
-    @beartype
-    def __init__(self, *args: Union[SupportsInt, "P", H]) -> None:
-        r"Initializer."
-        super().__init__(*args)
-
+class P(dyce.p.P):
     def __str__(self) -> str:
         group_counters: dict[H, int] = {}
 
-        for h, hs in groupby(self):  # type: ignore
+        for h, hs in groupby(cast(Iterable[H], self)):
             n = sum(1 for _ in hs)
             group_counters[h] = n
 
@@ -71,7 +60,7 @@ class P(_P):
             try:
                 if int(x) == 1:
                     return f"{n}d{y}"
-            except:
+            except ValueError:
                 pass
 
             return f"{n}@{str(h)}"
@@ -90,31 +79,56 @@ class P(_P):
             return super().__repr__()
         return f"{type(self).__name__}({str(self)})"
 
-    @beartype
-    def __add__(self, other: _OperandT):
-        if isinstance(other, (P, H)):
-            return P(self, other)
-        if isinstance(other, RealLike):
-            if other.is_integer():
-                other = int(other)  # type: ignore
-            return P(self, H({other: 1}))
-        return super().__add__(other)
-    def __radd__(self, other):
-        return self + other
+    def __add__(self, other: SupportsInt | "P" | H) -> "P":
+        return P(self, other)
+    def __radd__(self, other: SupportsInt | "P" | H) -> "P":
+        return P(self, other)
 
-    def __sub__(self, other: _OperandT):
-        if isinstance(other, (P, H)):
-            return P(self, -other)  # type: ignore
-        if isinstance(other, RealLike):
-            if other.is_integer():
-                other = int(other)  # type: ignore
-            return P(self, H({-other: 1}))
-        return super().__sub__(other)
-    def __rsub__(self, other):
-        return (-self) + other  # type: ignore
+    def __sub__(self, other: SupportsInt | "P" | H) -> "P":
+        return P(self, -other)  # type: ignore
+    def __rsub__(self, other: SupportsInt | "P" | H) -> "P":
+        return P(-self, other)  # type: ignore
 
 
-_dyce_p.P = P
+class R(dyce.r.R):
+    def _to_dict(self, default_annotation: str = "") -> dict[str, list[_R]]:
+        grouped: dict[str, list[_R]] = defaultdict(list)
+        for source in self.sources:
+            grouped[source.annotation or default_annotation].append(source)
+            # This may fail if source.annotation does not exist
+            # TODO: require annotations on all nodes, or confirm that this fallback method won't error
+        return dict(grouped)
+
+    def deep_to_dict(self, default_annotation: str = "") -> dict[str, Any]:
+        dictionary: dict[str, Any] = {}
+        for source in self.sources:
+            annotation = source.annotation or default_annotation
+            if isinstance(source, R):
+                source = source.deep_to_dict(default_annotation)
+            if annotation in dictionary:
+                if isinstance(dictionary[annotation], list):
+                    dictionary[annotation].append(source)
+                else:
+                    dictionary[annotation] = [dictionary[annotation], source]
+            else:
+                dictionary[annotation] = source
+        return dictionary
+
+
+def _apply_monkeypatches() -> None:
+    # Keep dyce module symbols aligned with local subclasses.
+    setattr(dyce.h, "H", H)
+    setattr(dyce.p, "H", H)
+    setattr(dyce.p, "P", P)
+    setattr(dyce.r, "H", H)
+    setattr(dyce.r, "P", P)
+    setattr(dyce.r, "R", R)
+    setattr(dyce, "H", H)
+    setattr(dyce, "P", P)
+    setattr(dyce, "R", R)
+
+
+_apply_monkeypatches()
 
 
 class _PrintMode(Enum):
@@ -124,8 +138,13 @@ class _PrintMode(Enum):
 
 _print_mode = _PrintMode.PRETTY
 
-def set_print_mode(mode: str) -> None:
+PrintModeName: TypeAlias = Literal["default", "pretty"]
+
+def set_print_mode(mode: PrintModeName | _PrintMode) -> None:
     r"Set the print mode."
     global _print_mode
-    if isinstance(_print_mode, str):
-        _print_mode = _PrintMode[mode.upper()]
+    if isinstance(mode, _PrintMode):
+        _print_mode = mode
+        return
+
+    _print_mode = _PrintMode[mode.upper()]
